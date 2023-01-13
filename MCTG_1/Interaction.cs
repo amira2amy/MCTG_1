@@ -8,14 +8,13 @@ using System;
 
 public class Interaction
 {
-    private readonly string _connectionString =
-        "Host=185.65.234.37;Username=underline;Password=underline;Database=mtcg_db";
+    
 
     public NpgsqlConnection conn;
 
     public Interaction()
     {
-        conn = new NpgsqlConnection(_connectionString);
+        conn = new NpgsqlConnection(DBString.ConnectionString);
         conn.Open();
     }
 
