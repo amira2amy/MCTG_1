@@ -14,7 +14,7 @@ public class Interaction
 
     public Interaction()
     {
-        conn = new NpgsqlConnection(DBString.ConnectionString);
+        conn = new NpgsqlConnection(Conn.ConnectionString);
         conn.Open();
     }
 
