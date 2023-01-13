@@ -1,6 +1,5 @@
 ﻿namespace MCTG_1;
 
-public class DBString
+public static class DBString
 {
-    
 }
