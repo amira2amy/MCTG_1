@@ -1,5 +1,5 @@
 ﻿using NUnit.Framework;
-
+// ReSharper disable HeapView.BoxingAllocation
 namespace MCTG_1;
 
 [TestFixture]

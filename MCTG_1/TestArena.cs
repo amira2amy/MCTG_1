@@ -1,5 +1,5 @@
 ﻿using NUnit.Framework;
-
+// ReSharper disable HeapView.BoxingAllocation
 namespace MCTG_1;
 
 [TestFixture]
@@ -39,7 +39,6 @@ public class TestArena
     {
         User user = new User();
         arena.AddToLobby(user);
-        
         Assert.AreEqual(1, arena.Lobby.Count);
     }
 }
