@@ -11,6 +11,8 @@ namespace MCTG_1
             Interaction interaction = new Interaction();
             interaction.SetCoins();
             Server server = new Server();
+            interaction.DeleteAllDecks();
+            interaction.DeleteAllCards();
             server.StartServer();
         }
     }

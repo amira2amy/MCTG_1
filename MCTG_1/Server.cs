@@ -8,6 +8,7 @@ using System.Threading;
 using System.Data;
 using System.Security.Cryptography;
 using Json.Net;
+using System.Net.Sockets;
 
 
 
@@ -15,296 +16,272 @@ namespace MCTG_1;
 
 public class Server
 {
-    private HttpListener listener;
+    private TcpListener listener;
     private Interaction interaction;
     private CardHandler cardHandler;
-    private List<List<Card>> kienboecCards;
-    private List<List<Card>> altenhofCards;
     private List<Card> kienboecDeck;
     private List<Card> altenhofDeck;
     public Server()
     {
-        listener = new HttpListener();
+        listener = new TcpListener(IPAddress.Any, 10001);
         interaction = new Interaction();
         cardHandler = new CardHandler();
-        kienboecCards = new List<List<Card>>();
-        altenhofCards = new List<List<Card>>();
         kienboecDeck = new List<Card>();
         altenhofDeck = new List<Card>();
     }
 
     public void StartServer()
     {
-        listener.Prefixes.Add("http://localhost:10001/");
         listener.Start();
         Console.WriteLine("Server started");
         while (true)
         {
-            HttpListenerContext context = listener.GetContext();
-            Thread thread = new Thread(new ParameterizedThreadStart(RequestHandler));
-            thread.Start(context);
+            TcpClient client = listener.AcceptTcpClient();
+            Thread thread = new Thread(() => RequestHandler(client));
+            thread.Start();
         }
     }
 
-    private void RequestHandler(object context)
+    private void RequestHandler(TcpClient client)
     {
-        HttpListenerContext httpContext = (HttpListenerContext)context;
-        HttpListenerRequest request = httpContext.Request;
-        HttpListenerResponse response = httpContext.Response;
+        NetworkStream stream = client.GetStream();
+        string request = "";
+        byte[] bts = new byte[2048];
+        int btsR;
+        do
+        {
+            btsR = stream.Read(bts, 0, bts.Length);
+            request = Encoding.UTF8.GetString(bts, 0, btsR);
+        } while (stream.DataAvailable);
+        
+        string method = request.Split(' ')[0];
+        string url = request.Split(' ')[1];
+        
+        //split request in seperate lines
+        string[] requestLines = request.Split('\n');
+        //search for authorization header and get token
+        string token = "";
+        string userToken = "";
+        foreach (string line in requestLines)
+        {
+            if (line.Contains("Authorization"))
+            {
+                token = line.Split(' ')[2];
+                userToken = token.Split("-")[0];
+            }
+        }
+        
+        //get last string in requestlines
+        string body = requestLines[requestLines.Length - 1];
+        
+        Console.WriteLine(request);
+        Console.WriteLine("----------------------------");
         string responseString = "";
         string userAuthorization = "";
         string contentType = "";
 
-        if (request.HttpMethod == "POST" && request.Url.AbsolutePath == "/users")
+        if (method == "POST" && url == "/users")
         {
-            using (System.IO.Stream body = request.InputStream)
+            // parse request body and create a new User object
+            User user = JsonNet.Deserialize<User>(body);
+            if (interaction.RegisterUser(user))
             {
-                using (System.IO.StreamReader reader = new System.IO.StreamReader(body, request.ContentEncoding))
-                {
-                    string json = reader.ReadToEnd();
-                    // parse request body and create a new User object
-                    User user = JsonNet.Deserialize<User>(json);
-                    if (interaction.RegisterUser(user))
-                    {
-                        Console.WriteLine("User " + user.Username + " registered successfully");
-                    }
-                    else
-                    {
-                        Console.WriteLine("User " + user.Username + " already exists");
-                    }
-                }
-            }
-
-        }
-        else if (request.HttpMethod == "POST" && request.Url.AbsolutePath == "/sessions")
-        {
-            using (System.IO.Stream body = request.InputStream)
-            {
-                using (System.IO.StreamReader reader = new System.IO.StreamReader(body, request.ContentEncoding))
-                {
-                    string json = reader.ReadToEnd();
-                    // parse request body and create a new User object
-                    User user = JsonNet.Deserialize<User>(json);
-                    if (interaction.Login(user))
-                    {
-                        Console.WriteLine("User " + user.Username + " logged in successfully");
-                    }
-                    else
-                    {
-                        Console.WriteLine("User " + user.Username + " login failed");
-                    }
-                }
-            }
-        }
-        else if (request.HttpMethod == "POST" && request.Url.AbsolutePath == "/packages")
-        {
-            userAuthorization = request.Headers["Authorization"];
-            if (userAuthorization == "Basic admin-mtcgToken")
-            {
-                using (System.IO.Stream body = request.InputStream)
-                {
-                    using (System.IO.StreamReader reader = new System.IO.StreamReader(body, request.ContentEncoding))
-                    {
-                        string json = reader.ReadToEnd();
-                        // parse request body and create a new User object
-
-                        List<Card> package = JsonNet.Deserialize<List<Card>>(json);
-
-                        cardHandler.packages.Add(package);
-                        Console.WriteLine("Package created with " + package.Count + " cards");
-                        Console.WriteLine(cardHandler.packages.Count + " packages created");
-                        
-                    }
-                }
+                responseString = "User " + user.Username + " registered successfully";
             }
             else
             {
-                Console.WriteLine("Not an admin");
+                responseString = "User " + user.Username + " already exists";
+            }
+        }else if (method == "POST" && url == "/sessions")
+        {
+            string json = body;
+            // parse request body and create a new User object
+            User user = JsonNet.Deserialize<User>(json);
+            if (interaction.Login(user))
+            {
+                responseString = "User " + user.Username + " logged in successfully";
+            }
+            else
+            {
+                responseString = "User " + user.Username + " login failed";
+            }
+        }else if (method == "POST" && url == "/packages")
+        {
+            if (userToken == "admin")
+            {
+                string json = body;
+                // parse request body and create a new User object
+                List<Card> package = JsonNet.Deserialize<List<Card>>(json);
+                cardHandler.packages.Add(package);
+                responseString = "Package created with " + package.Count + " cards";
+                responseString = cardHandler.packages.Count + " packages created";
+            }
+            else
+            {
+                responseString = "Not an admin";
             }
 
 
         }
-        else if (request.HttpMethod == "POST" && request.Url.AbsolutePath == "/transactions/packages")
+        else if (method == "POST" && url == "/transactions/packages")
         {
             User currentUser = new User();
-            userAuthorization = request.Headers["Authorization"];
-            if (userAuthorization == "Basic kienboec-mtcgToken")
-            {
-                currentUser.Username= "kienboec";
-            }else if (userAuthorization == "Basic altenhof-mtcgToken")
-            {
-                currentUser.Username = "altenhof";
-            }
+            currentUser.Username = userToken;
 
             if (interaction.GetUserCoins(currentUser) >= 5)
             {
                 if (cardHandler.packages.Count > 0)
                 {
-                    if (currentUser.Username == "kienboec")
-                    {
-                        kienboecCards.Add(cardHandler.packages[0]);
-                        //currentUser.Cards.Add(cardHandler.packages[0]);
-                    }else if(currentUser.Username == "altenhof")
-                    {
-                        altenhofCards.Add(cardHandler.packages[0]);
-                    }
-
+                    
+                    cardHandler.baughtCards = (cardHandler.packages[0]);
+                    interaction.SaveCards(cardHandler.baughtCards, currentUser.Username);
                     cardHandler.packages.Remove(cardHandler.packages[0]);
                     interaction.UpdateCoins(currentUser);
-                    Console.WriteLine("Package bought by " + currentUser.Username);
-                    Console.WriteLine("Packages left: " + cardHandler.packages.Count);
-                    Console.WriteLine("Coins left: " + interaction.GetUserCoins(currentUser));
+                    responseString += "Package bought by " + currentUser.Username;
+                    responseString += "\nPackages left: " + cardHandler.packages.Count;
+                    responseString += "\nCoins left: " + interaction.GetUserCoins(currentUser);
+                    
                 }else
                 {
-                    Console.WriteLine("No packages left");
+                    responseString = "No packages left";
                 }
                 
             }
             else
             {
-                Console.WriteLine("Not enough coins");
+                responseString = "Not enough coins";
             }
 
-        }else if (request.HttpMethod == "GET" && request.Url.AbsolutePath == "/cards")
+        }else if (method == "GET" && url == "/cards")
         {
-            userAuthorization = request.Headers["Authorization"];
-            if (string.IsNullOrEmpty(userAuthorization))
+            if (string.IsNullOrEmpty(token))
             {
-                Console.WriteLine("No token");
+                responseString = "No token";
             }else
             {
                 User currentUser = new User();
-                if (userAuthorization.Contains("kienboec"))
-                {
-                    for (int i = 0; i < kienboecCards.Count; i++)
-                    {
-                        for (int j = 0; j < kienboecCards[i].Count; j++)
-                        {
-                            Console.WriteLine("Card for kienboec: " + kienboecCards[i][j].Name + " " + kienboecCards[i][j].Damage);
-                        }
-                    }
-                }else if (userAuthorization.Contains("altenhof"))
-                {
-                    for (int i = 0; i < altenhofCards.Count; i++)
-                    {
-                        for (int j = 0; j < altenhofCards[i].Count; j++)
-                        {
-                            Console.WriteLine("Card for altenhof: " + altenhofCards[i][j].Name + " " + altenhofCards[i][j].Damage);
-                        }
-                    }
-                }
-                
+                currentUser.Username = userToken;
+                responseString = interaction.GetCardInfo(currentUser.Username);
             }
-        }
-        /*
-        else if (request.HttpMethod == "GET" && request.Url.AbsolutePath == "/deck")
+        }else if (url == "/deck")
         {
-            userAuthorization = request.Headers["Authorization"];
-            contentType = request.Headers["Content-Type"];
-            if (userAuthorization.Contains("kienboec") && string.IsNullOrEmpty(contentType))
+            if (method == "GET")
             {
-                User currentUser = new User();
-                currentUser.Username = "kienboec";
-                //take 4 random cards from kienboecCards and add them to kienboecDeck
-                for (int i = 0; i < 4; i++)
+                if (string.IsNullOrEmpty(token))
                 {
-                    Random rd = new Random();
-                    //pick a random package from kienboecCards
-                    int randomPackage = rd.Next(0, kienboecCards.Count);
-                    //pick a random card from the package
-                    int randomCard = rd.Next(0, kienboecCards[randomPackage].Count);
-                    //add the card to the deck
-                    kienboecDeck.Add(kienboecCards[randomPackage][randomCard]);
+                    responseString = "No token";
+                }else
+                {
+                    User currentUser = new User();
+                    currentUser.Username = userToken;
+                    responseString = interaction.GetDeckInfo(currentUser.Username);
                 }
-                
-                for (int i = 0; i < kienboecDeck.Count; i++)
+            }else if (method == "PUT")
+            {
+                if (string.IsNullOrEmpty(token))
                 {
-                    Console.WriteLine("Unconfigured Card for kienboec: " + kienboecDeck[i].Name + " " + kienboecDeck[i].Damage);
-                }
-                Console.WriteLine("Done");
-                for (int i = 0; i < kienboecCards.Count; i++)
+                    responseString = "No token";
+                }else
                 {
-                    for (int j = 0; j < kienboecCards[i].Count; j++)
+                    User currentUser = new User();
+                    currentUser.Username = userToken;
+                    List<string> deckString = JsonNet.Deserialize<List<string>>(body);
+                    if (deckString.Count != 4)
                     {
-                        interaction.InsertCard(kienboecCards[i][j], currentUser);
+                        responseString = "Deck must contain 4 cards";
+                    }
+                    else
+                    {
+                        
+                        List<Card> deck = interaction.GetDeckByStrings(deckString, currentUser.Username);
+                        if (deck.Count < 4)
+                        {
+                            responseString = "Failed: One or more cards not found in your cards";
+                        }
+                        else
+                        {
+                            interaction.SaveDeck(deck, currentUser.Username);
+                            responseString = "Deck saved";
+                        }
                     }
                 }
-                
-            }else if (userAuthorization.Contains("altenhof") && string.IsNullOrEmpty(contentType))
-            {
-                User currentUser = new User();
-                currentUser.Username = "altenhof";
-                //take 4 random cards from altenhofCards and add them to altenhofDeck
-                for (int i = 0; i < 4; i++)
-                {
-                    Random rd = new Random();
-                    //pick a random package from altenhofCards
-                    int randomPackage = rd.Next(0, altenhofCards.Count);
-                    //pick a random card from the package
-                    int randomCard = rd.Next(0, altenhofCards[randomPackage].Count);
-                    //add the card to the deck
-                    altenhofDeck.Add(altenhofCards[randomPackage][randomCard]);
-                }
-                
-                for (int i = 0; i < altenhofDeck.Count; i++)
-                {
-                    Console.WriteLine("Unconfigured Card for altenhof: " + altenhofDeck[i].Name + " " + altenhofDeck[i].Damage);
-                }
-                Console.WriteLine("Done");
             }
-
-
-            kienboecDeck.Clear();
-            altenhofDeck.Clear();
-        }
-        */
-        else if (request.HttpMethod == "GET" && request.Url.AbsolutePath == "/stats")
+        }else if (method == "GET" && url == "/stats")
         {
             User currentUser = new User();
             int elo;
-            userAuthorization = request.Headers["Authorization"];
-            if (userAuthorization.Contains("kienboec"))
-            {
-                currentUser.Username = "kienboec";
-                elo = interaction.GetElo(currentUser);
-                Console.WriteLine("Elo for kienboec: " + elo);
-            }else if (userAuthorization.Contains("altenhof"))
-            {
-                currentUser.Username = "altenhof";
-                elo = interaction.GetElo(currentUser);
-                Console.WriteLine("Elo for altenhof: " + elo);
-            }
-            
-        }else if (request.HttpMethod == "GET" && request.Url.AbsolutePath == "/score")
+            currentUser.Username = userToken;
+            elo = interaction.GetElo(currentUser);
+            responseString = "Elo for " + userToken + ": " + elo;
+        }else if (method == "GET" && url == "/score")
         {
             User currentUser = new User();
-            userAuthorization = request.Headers["Authorization"];
-            if (userAuthorization.Contains("kienboec"))
+            currentUser.Username = userToken;
+            if (interaction.UserExists(currentUser.Username))
             {
-                currentUser.Username = "kienboec";
-                if (interaction.UserExists(currentUser.Username))
+                string allElo = "";
+                Console.WriteLine("User exists");
+                for (int i = 0; i < interaction.UserAmount(); i++)
                 {
-                    Console.WriteLine("User exists");
-                    for (int i = 0; i < interaction.UserAmount(); i++)
-                    {
-                        Console.WriteLine(interaction.GetEloAndUsername(i));
-                    }
+                    allElo += interaction.GetEloAndUsername(i);
+                    allElo += "\n";
                 }
-                else
-                {
-                    Console.WriteLine("User does not exist");
-                }
-                
+                responseString = allElo;
             }
+            else
+            {
+                responseString = "User does not exist";
+            }
+        }else if (url.Contains("/users/"))
+        {
+            Console.WriteLine(url);
+            string[] urls = url.Split('/');
+            string dataUser = urls[2];
+            Console.WriteLine(dataUser);
+            if (method == "PUT")
+            {
+                if (dataUser == userToken)
+                {
+                    //User currentuser = new User();
+                    //currentuser.Username = dataUser;
+                    User user = JsonNet.Deserialize<User>(body);
+                    user.Username = dataUser;
+                    responseString = "Your data is set: " + user.Name + " " + user.Bio + " " + user.Image;
+                    interaction.UpdateUser(user);
+                    
+                }else
+                {
+                    responseString = "User does not exist";
+                }
+            }else if (method == "GET")
+            {
+                if (dataUser == userToken)
+                {
+                    User currentuser = new User();
+                    currentuser.Username = dataUser;
+                    Console.WriteLine("User exists");
+                    responseString = interaction.SelectUser(currentuser);
+                }else
+                {
+                    responseString = "User does not exist";
+                }
+            }
+        }else if (url == "/tradings")
+        {
         }
-
-
-        byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
-            response.ContentLength64 = buffer.Length;
-            System.IO.Stream output = response.OutputStream;    
-            output.Write(buffer, 0, buffer.Length);
-            output.Close();
-        }
+        
+        StringBuilder response = new StringBuilder();
+        StringWriter writer = new StringWriter();
+        response.Append("HTTP/1.1 200 OK\r\n");
+        response.Append("Content-Type: application/json\r\n");
+        response.Append("Content-Length: " + responseString.Length + "\r\n\r\n");
+        response.Append(responseString);
+        byte[] buffer = System.Text.Encoding.UTF8.GetBytes(response.ToString());
+        stream.Write(buffer, 0, buffer.Length);
+        
+        client.Close();
+        
+    }
     
 
 }
