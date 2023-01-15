@@ -1,15 +1,10 @@
-﻿using System.Security.Cryptography;
+﻿using Npgsql;
 using NpgsqlTypes;
 
 namespace MCTG_1;
-using Npgsql;
-using System;
-
 
 public class Interaction
 {
-    
-
     public NpgsqlConnection conn;
 
     public Interaction()
@@ -20,7 +15,7 @@ public class Interaction
 
     public int GetUserID(string username)
     {
-        int id = -1;
+        var id = -1;
         using (var con = new NpgsqlConnection(Conn.ConnectionString))
         {
             con.Open();
@@ -29,13 +24,10 @@ public class Interaction
                 cmd.Parameters.AddWithValue("username", username);
                 cmd.Prepare();
                 var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    id = reader.GetInt32(0);
-                }
+                while (reader.Read()) id = reader.GetInt32(0);
             }
         }
-        
+
 
         return id;
     }
@@ -54,8 +46,8 @@ public class Interaction
             cmd.Prepare();
             cmd.ExecuteNonQuery();
         }*/
-        int id = GetUserID(currentUser.Username);
-        NpgsqlCommand cmd = new NpgsqlCommand();
+        var id = GetUserID(currentUser.Username);
+        var cmd = new NpgsqlCommand();
         cmd.Connection = conn;
         cmd.CommandText =
             "INSERT INTO mtcg_db.public.deck (card_id, card_name, card_damage, user_fk) VALUES (@card_id, @card_name, @card_damage, @user_fk)";
@@ -83,14 +75,12 @@ public class Interaction
         
         }
          */
-
-
     }
 
 
     public int GetUserCoins(User user)
     {
-        int coins = 0;
+        var coins = 0;
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
@@ -99,10 +89,7 @@ public class Interaction
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
             {
-                while (reader.Read())
-                {
-                    coins = reader.GetInt32(0);
-                }
+                while (reader.Read()) coins = reader.GetInt32(0);
             }
         }
 
@@ -139,7 +126,7 @@ public class Interaction
 
     public bool UserExists(string username)
     {
-        bool exists = false;
+        var exists = false;
         //check if username is in database
         using (var cmd = new NpgsqlCommand())
         {
@@ -149,26 +136,18 @@ public class Interaction
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
             {
-                if (reader.Read())
-                {
-                    exists = true;
-                }
+                if (reader.Read()) exists = true;
             }
         }
 
         return exists;
-
-
     }
 
     //method to register a new user
     public bool RegisterUser(User user)
     {
         //check if username already exists
-        if (UserExists(user.Username))
-        {
-            return false;
-        }
+        if (UserExists(user.Username)) return false;
 
         //insert new user into database
         using (var cmd = new NpgsqlCommand())
@@ -179,24 +158,17 @@ public class Interaction
             cmd.Parameters.AddWithValue("password", user.Password);
             cmd.Prepare();
             cmd.ExecuteNonQuery();
-
         }
 
         return true;
-
-
-
     }
 
     //method to login
     public bool Login(User user)
     {
         //check if username exists
-        if (!UserExists(user.Username))
-        {
-            return false;
-        }
-        bool check = false;
+        if (!UserExists(user.Username)) return false;
+        var check = false;
         //check if password is correct
         using (var cmd = new NpgsqlCommand())
         {
@@ -217,12 +189,11 @@ public class Interaction
 
             return check;
         }
-
     }
 
     public int GetElo(User user)
     {
-        int elo = 0;
+        var elo = 0;
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
@@ -231,10 +202,7 @@ public class Interaction
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
             {
-                while (reader.Read())
-                {
-                    elo = reader.GetInt32(0);
-                }
+                while (reader.Read()) elo = reader.GetInt32(0);
             }
         }
 
@@ -243,7 +211,7 @@ public class Interaction
 
     public int UserAmount()
     {
-        int amount = 0;
+        var amount = 0;
         //get amount of users in database
         using (var cmd = new NpgsqlCommand())
         {
@@ -252,10 +220,7 @@ public class Interaction
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
             {
-                while (reader.Read())
-                {
-                    amount = reader.GetInt32(0);
-                }
+                while (reader.Read()) amount = reader.GetInt32(0);
             }
         }
 
@@ -264,7 +229,7 @@ public class Interaction
 
     public string GetEloAndUsername(int id)
     {
-        string eloAndUsername = "";
+        var eloAndUsername = "";
         //get elo and username of user with id
         using (var cmd = new NpgsqlCommand())
         {
@@ -274,68 +239,25 @@ public class Interaction
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
             {
-                while (reader.Read())
-                {
-                    eloAndUsername = reader.GetString(0) + ": " + reader.GetInt32(1);
-                }
+                while (reader.Read()) eloAndUsername = reader.GetString(0) + ": " + reader.GetInt32(1);
             }
         }
 
         return eloAndUsername;
     }
-    
-    public void AddNameAndBio(User user)
-    {
-        //add name and bio to user
-        using (var cmd = new NpgsqlCommand())
-        {
-            cmd.Connection = conn;
-            cmd.CommandText = "UPDATE mtcg_db.public.user SET name = @name, bio = @bio WHERE username = @username";
-            cmd.Parameters.AddWithValue("username", user.Username);
-            cmd.Parameters.AddWithValue("name", user.Name);
-            cmd.Parameters.AddWithValue("bio", user.Bio);
-            cmd.Prepare();
-            cmd.ExecuteNonQuery();
-        }
-    }
-    
-    //method to insert bio to current user
-    public void InsertBioAndName(User user)
-    {
-        //check if username exists
-        if (!UserExists(user.Username))
-        {
-            return;
-        }
 
-        //insert bio and name into database
-        using (var cmd = new NpgsqlCommand())
-        {
-            cmd.Connection = conn;
-            cmd.CommandText = "UPDATE mtcg_db.public.user SET bio = @bio, name = @name WHERE username = @username";
-            cmd.Parameters.AddWithValue("username", user.Username);
-            cmd.Parameters.AddWithValue("bio", user.Bio);
-            cmd.Parameters.AddWithValue("name", user.Name);
-            cmd.Prepare();
-            cmd.ExecuteNonQuery();
-
-        }
-    }
-    
     //update Name, Bio, Image in user table
     public void UpdateUser(User user)
     {
         //check if username exists
-        if (!UserExists(user.Username))
-        {
-            return;
-        }
+        if (!UserExists(user.Username)) return;
 
         //insert bio and name into database
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
-            cmd.CommandText = "UPDATE mtcg_db.public.user SET bio = @bio, name = @name, image = @image WHERE username = @username";
+            cmd.CommandText =
+                "UPDATE mtcg_db.public.user SET bio = @bio, name = @name, image = @image WHERE username = @username";
 
             cmd.Parameters.AddWithValue("username", user.Username);
             // ReSharper disable PossibleNullReferenceException
@@ -344,18 +266,14 @@ public class Interaction
             cmd.Parameters.AddWithValue("image", user.Image);
             cmd.Prepare();
             cmd.ExecuteNonQuery();
-
         }
     }
-    
+
     //method to select all from user
     public string? SelectUser(User user)
     {
         //check if username exists
-        if (!UserExists(user.Username))
-        {
-            return null;
-        }
+        if (!UserExists(user.Username)) return null;
         string? result = null;
         //select all from user
         using (var cmd = new NpgsqlCommand())
@@ -367,9 +285,9 @@ public class Interaction
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
-                {
-                    result = reader.GetInt32(0) + " " + reader.GetString(1) + " " + reader.GetString(2) + " " + reader.GetInt32(3) + " " + reader.GetInt32(4) + " " + reader.GetString(5)+ " " + reader.GetString(6)+ " " + reader.GetString(7);    
-                }
+                    result = reader.GetInt32(0) + " " + reader.GetString(1) + " " + reader.GetString(2) + " " +
+                             reader.GetInt32(3) + " " + reader.GetInt32(4) + " " + reader.GetString(5) + " " +
+                             reader.GetString(6) + " " + reader.GetString(7);
             }
         }
 
@@ -378,14 +296,14 @@ public class Interaction
 
     public void SaveCards(List<Card> boughtCards, string username)
     {
-        int id = GetUserID(username);
-        foreach (Card card in boughtCards)
-        {
+        var id = GetUserID(username);
+        foreach (var card in boughtCards)
             //insert card in database with user id
             using (var cmd = new NpgsqlCommand())
             {
                 cmd.Connection = conn;
-                cmd.CommandText = "INSERT INTO mtcg_db.public.cards (userid, cardid, card_name, card_damage) VALUES (@userid, @cardid, @card_name, @card_damage)";
+                cmd.CommandText =
+                    "INSERT INTO mtcg_db.public.cards (userid, cardid, card_name, card_damage) VALUES (@userid, @cardid, @card_name, @card_damage)";
                 cmd.Parameters.AddWithValue("userid", id);
                 cmd.Parameters.AddWithValue("cardid", card.Id);
                 cmd.Parameters.AddWithValue("card_name", card.Name);
@@ -393,14 +311,13 @@ public class Interaction
                 cmd.Prepare();
                 cmd.ExecuteNonQuery();
             }
-        }
     }
 
     public string GetCardInfo(string username)
     {
         //get all cards from user
-        string cardInfo = "";
-        int id = GetUserID(username);
+        var cardInfo = "";
+        var id = GetUserID(username);
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
@@ -422,12 +339,13 @@ public class Interaction
     public string GetDeckInfo(string username)
     {
         //get all cards from user
-        string deckInfo = "Deck: \n";
-        int id = GetUserID(username);
+        var deckInfo = "Deck: \n";
+        var id = GetUserID(username);
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
-            cmd.CommandText = "SELECT card_id, card_name, card_damage FROM mtcg_db.public.deck WHERE user_fk = @user_fk";
+            cmd.CommandText =
+                "SELECT card_id, card_name, card_damage FROM mtcg_db.public.deck WHERE user_fk = @user_fk";
             cmd.Parameters.AddWithValue("user_fk", id);
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
@@ -441,19 +359,40 @@ public class Interaction
 
         if (deckInfo == "Deck: \n")
         {
-            List<Card> randomdeck = Get4RandomCards(id);
+            var randomdeck = Get4RandomCards(id);
             SaveDeck(randomdeck, username);
             return GetDeckInfo(username);
-        } else
-        {
-            return deckInfo;
         }
-        
+
+        return deckInfo;
     }
-    
-    public void SaveDeck(List<Card> deck, string username)
+
+    public int GetCardsAmountFromDeck(string username)
     {
         int id = GetUserID(username);
+        int amount = 0;
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText =
+                "SELECT COUNT(*) FROM mtcg_db.public.deck WHERE user_fk = @user_fk";
+            cmd.Parameters.AddWithValue("user_fk", id);
+            cmd.Prepare();
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    amount = reader.GetInt32(0);
+                }
+            }
+        }
+
+        return amount;
+    }
+
+    public void SaveDeck(List<Card> deck, string username)
+    {
+        var id = GetUserID(username);
         //delete current deck
         using (var cmd = new NpgsqlCommand())
         {
@@ -463,13 +402,14 @@ public class Interaction
             cmd.Prepare();
             cmd.ExecuteNonQuery();
         }
-        foreach (Card card in deck)
-        {
+
+        foreach (var card in deck)
             //insert card in database with user id
             using (var cmd = new NpgsqlCommand())
             {
                 cmd.Connection = conn;
-                cmd.CommandText = "INSERT INTO mtcg_db.public.deck (user_fk, card_id, card_name, card_damage) VALUES (@user_fk, @card_id, @card_name, @card_damage)";
+                cmd.CommandText =
+                    "INSERT INTO mtcg_db.public.deck (user_fk, card_id, card_name, card_damage) VALUES (@user_fk, @card_id, @card_name, @card_damage)";
                 cmd.Parameters.AddWithValue("user_fk", id);
                 cmd.Parameters.AddWithValue("card_id", card.Id);
                 cmd.Parameters.AddWithValue("card_name", card.Name);
@@ -477,37 +417,24 @@ public class Interaction
                 cmd.Prepare();
                 cmd.ExecuteNonQuery();
             }
-        }
-    }
-    
-    public void DeleteDeck(string username)
-    {
-        int id = GetUserID(username);
-        using (var cmd = new NpgsqlCommand())
-        {
-            cmd.Connection = conn;
-            cmd.CommandText = "DELETE FROM mtcg_db.public.deck WHERE user_fk = @user_fk";
-            cmd.Parameters.AddWithValue("user_fk", id);
-            cmd.Prepare();
-            cmd.ExecuteNonQuery();
-        }
     }
 
     public List<Card> Get4RandomCards(int userid)
     {
         //get 4 random cards from user
-        List<Card> randomCards = new List<Card>();
+        var randomCards = new List<Card>();
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
-            cmd.CommandText = "SELECT cardid, card_name, card_damage FROM mtcg_db.public.cards WHERE userid = @userid ORDER BY RANDOM() LIMIT 4";
+            cmd.CommandText =
+                "SELECT cardid, card_name, card_damage FROM mtcg_db.public.cards WHERE userid = @userid ORDER BY RANDOM() LIMIT 4";
             cmd.Parameters.AddWithValue("userid", userid);
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    Card card = new Card();
+                    var card = new Card();
                     card.Id = reader.GetString(0);
                     card.Name = reader.GetString(1);
                     card.Damage = reader.GetDouble(2);
@@ -515,6 +442,7 @@ public class Interaction
                 }
             }
         }
+
         return randomCards;
     }
 
@@ -529,7 +457,7 @@ public class Interaction
             cmd.ExecuteNonQuery();
         }
     }
-    
+
     public void DeleteAllDecks()
     {
         //delete all cards from cards table
@@ -542,16 +470,29 @@ public class Interaction
         }
     }
 
+    public void DeleteDeckFromUser(string username)
+    {
+        var userID = GetUserID(username);
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "DELETE FROM mtcg_db.public.deck WHERE user_fk = @user_fk";
+            cmd.Parameters.AddWithValue("user_fk", userID);
+            cmd.Prepare();
+            cmd.ExecuteNonQuery();
+        }
+    }
+
     public List<Card> GetDeckByStrings(List<string> deckStrings, string username)
     {
-        int userId = GetUserID(username);
-        List<Card> deck = new List<Card>();
-        foreach (string cardString in deckStrings)
-        {
+        var userId = GetUserID(username);
+        var deck = new List<Card>();
+        foreach (var cardString in deckStrings)
             using (var cmd = new NpgsqlCommand())
             {
                 cmd.Connection = conn;
-                cmd.CommandText = "SELECT cardid, card_name, card_damage FROM mtcg_db.public.cards WHERE userid = @userid AND cardid = @cardid";
+                cmd.CommandText =
+                    "SELECT cardid, card_name, card_damage FROM mtcg_db.public.cards WHERE userid = @userid AND cardid = @cardid";
                 cmd.Parameters.AddWithValue("userid", userId);
                 cmd.Parameters.AddWithValue("cardid", cardString);
                 cmd.Prepare();
@@ -559,7 +500,7 @@ public class Interaction
                 {
                     while (reader.Read())
                     {
-                        Card card = new Card();
+                        var card = new Card();
                         card.Id = reader.GetString(0);
                         card.Name = reader.GetString(1);
                         card.Damage = reader.GetDouble(2);
@@ -567,13 +508,13 @@ public class Interaction
                     }
                 }
             }
-        }
+
         return deck;
     }
 
     public string GetAvailableTrades(string username)
     {
-        string trades = "Trades available (without yours): \n";
+        var trades = "Trades available (without yours): \n";
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
@@ -583,27 +524,25 @@ public class Interaction
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
-                {
-                    trades += "CardID: " + reader.GetString(1) + " CardType: " + reader.GetString(2) + " Minimum Damage: " + reader.GetDouble(3) + " User: " + reader.GetString(4) + "\n";
-                }
+                    trades += "CardID: " + reader.GetString(1) + " CardType: " + reader.GetString(2) +
+                              " Minimum Damage: " + reader.GetDouble(3) + " User: " + reader.GetString(4) + "\n";
             }
         }
+
         return trades;
     }
 
     public string UploadTrade(Trade trade)
     {
         //check if card belongs to user
-        if (!CardBelongsToUser(trade.CardToTrade, trade.username))
-        {
-            return "Card does not belong to you!";
-        }
-        
+        if (!CardBelongsToUser(trade.CardToTrade, trade.username)) return "Card does not belong to you!";
+
         //upload trade
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
-            cmd.CommandText = "INSERT INTO mtcg_db.public.tradings (id, cardid, cardtype, mindamage, username) VALUES (@id, @cardid, @cardtype, @mindamage, @username)";
+            cmd.CommandText =
+                "INSERT INTO mtcg_db.public.tradings (id, cardid, cardtype, mindamage, username) VALUES (@id, @cardid, @cardtype, @mindamage, @username)";
             cmd.Parameters.AddWithValue("id", trade.Id);
             cmd.Parameters.AddWithValue("cardid", trade.CardToTrade);
             cmd.Parameters.AddWithValue("cardtype", trade.Type);
@@ -612,15 +551,15 @@ public class Interaction
             cmd.Prepare();
             cmd.ExecuteNonQuery();
         }
-        
+
         return "Trade successfully created!";
     }
 
     public bool CardBelongsToUser(string cardid, string username)
     {
         var id = GetUserID(username);
-        bool belongsToUser = false;
-        
+        var belongsToUser = false;
+
         //check if card belongs to user
         using (var cmd = new NpgsqlCommand())
         {
@@ -631,19 +570,17 @@ public class Interaction
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
             {
-                while (reader.Read())
-                {
-                    belongsToUser = true;
-                }
+                while (reader.Read()) belongsToUser = true;
             }
         }
+
         return belongsToUser;
     }
 
     public bool TradeBelongsToUser(string tradeid, string username)
     {
         //check if trade belongs to user
-        bool belongsToUser = false;
+        var belongsToUser = false;
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
@@ -653,21 +590,16 @@ public class Interaction
             cmd.Prepare();
             using (var reader = cmd.ExecuteReader())
             {
-                while (reader.Read())
-                {
-                    belongsToUser = true;
-                }
+                while (reader.Read()) belongsToUser = true;
             }
         }
+
         return belongsToUser;
     }
 
     public string DeleteTrade(string tradeid, string username)
     {
-        if (!TradeBelongsToUser(tradeid, username))
-        {
-            return "This trade does not belong to you!";
-        }
+        if (!TradeBelongsToUser(tradeid, username)) return "This trade does not belong to you!";
 
         using (var cmd = new NpgsqlCommand())
         {
@@ -683,9 +615,9 @@ public class Interaction
 
     public List<Card> GetDeckOfUser(string username)
     {
-        int id = GetUserID(username);
-        
-        List<Card> deck = new List<Card>();
+        var id = GetUserID(username);
+
+        var deck = new List<Card>();
         using (var cmd = new NpgsqlCommand())
         {
             cmd.Connection = conn;
@@ -696,7 +628,7 @@ public class Interaction
             {
                 while (reader.Read())
                 {
-                    Card card = new Card();
+                    var card = new Card();
                     card.Id = reader.GetString(0);
                     card.Name = reader.GetString(1);
                     card.Damage = reader.GetDouble(2);
@@ -704,7 +636,51 @@ public class Interaction
                 }
             }
         }
+
         return deck;
     }
 
+    public void UpdateWinner(string username)
+    {
+        //add 3 points to elo of user
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "UPDATE mtcg_db.public.user SET elo = elo + 3 WHERE username = @username";
+            cmd.Parameters.AddWithValue("username", username);
+            cmd.Prepare();
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public void UpdateLoser(string username)
+    {
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "UPDATE mtcg_db.public.user SET elo = elo - 5 WHERE username = @username";
+            cmd.Parameters.AddWithValue("username", username);
+            cmd.Prepare();
+            cmd.ExecuteNonQuery();
+        }
+    }
+    
+    public bool DeleteUser(string username)
+    {
+        var id = GetUserID(username);
+        if (id == -1)
+        {
+            return false;
+        }
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "DELETE FROM mtcg_db.public.user WHERE id = @id";
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Prepare();
+            cmd.ExecuteNonQuery();
+        }
+
+        return true;
+    }
 }

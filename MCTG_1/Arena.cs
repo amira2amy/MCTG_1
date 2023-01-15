@@ -2,8 +2,8 @@
 
 public class Arena
 {
-
     public List<User> Lobby;
+    public Interaction interaction;
 
     public Dictionary<int, string> Log;
 
@@ -11,6 +11,7 @@ public class Arena
     {
         Lobby = new List<User>();
         Log = new Dictionary<int, string>();
+        interaction = new Interaction();
     }
 
     public void AddToLobby(User user)
@@ -20,26 +21,27 @@ public class Arena
 
     public string PrintLog()
     {
-        string log = "";
-        foreach (KeyValuePair<int, string> entry in Log)
-        {
-            log += entry.Key + ": " + entry.Value + "\n";
-        }
+        var log = "";
+        foreach (var entry in Log) log += entry.Key + ": " + entry.Value + "\n";
         return log;
     }
-    
+
     public void Battle()
     {
         if (Lobby.Count == 2)
         {
-            int result = OnevOne(Lobby[0].Deck, Lobby[1].Deck);
+            var result = OnevOne(Lobby[0].Deck, Lobby[1].Deck);
             if (result == 1)
             {
                 Log.Add(-1, Lobby[0].Username + " won the battle!");
+                interaction.UpdateWinner(Lobby[0].Username);
+                interaction.UpdateLoser(Lobby[1].Username);
             }
-            else if(result == 2)
+            else if (result == 2)
             {
                 Log.Add(-1, Lobby[1].Username + " won the battle!");
+                interaction.UpdateWinner(Lobby[1].Username);
+                interaction.UpdateLoser(Lobby[0].Username);
             }
             else
             {
@@ -47,19 +49,19 @@ public class Arena
             }
         }
     }
-    
+
     public int OnevOne(List<Card> deck1, List<Card> deck2)
     {
         //Fight RANDOMLY
-        Random rnd = new Random();
-        int rnd1 = 0; 
-        int rnd2 = 0;
-        int rnd3 = 0;
-        int rnd4 = 0;
-        string result = "";
-        List<Card> deadCards = new List<Card>();
-        int round = 0;
-    
+        var rnd = new Random();
+        var rnd1 = 0;
+        var rnd2 = 0;
+        var rnd3 = 0;
+        var rnd4 = 0;
+        var result = "";
+        var deadCards = new List<Card>();
+        var round = 0;
+
         do
         {
             round++;
@@ -70,13 +72,14 @@ public class Arena
             {
                 Console.WriteLine("Card 1 wins");
                 //Print deck sizes
-                
+
                 deadCards.Add(deck2[rnd2]);
                 deck2.RemoveAt(rnd2);
 
                 Console.WriteLine("Deck 1: " + deck1.Count);
                 Console.WriteLine("Deck 2: " + deck2.Count);
-            }else if (result == "Card 2 wins")
+            }
+            else if (result == "Card 2 wins")
             {
                 Console.WriteLine("Card 2 wins");
                 //Print deck sizes
@@ -90,7 +93,6 @@ public class Arena
             {
                 //Reincarnate for each player 
                 if (deck1.Count == 1 && deck2.Count == 1)
-                {
                     if (deadCards.Count > 0)
                     {
                         Console.WriteLine("Reincarnating1...");
@@ -105,50 +107,39 @@ public class Arena
                             deadCards.RemoveAt(rnd4);
                         }
                     }
-                }
-                
+
                 Console.WriteLine("Draw!");
             }
-        }while(deck2.Count > 0 && deck1.Count > 0 && round < 100);
+        } while (deck2.Count > 0 && deck1.Count > 0 && round < 100);
+
         Console.WriteLine("Battle finished");
-        
-        if (round == 100)
-        {
-            return 0;
-        }
-        
-        if (deck1.Count > 0)
-        {
-            return 1;
-        }
-        
-        
+
+        if (round == 100) return 0;
+
+        if (deck1.Count > 0) return 1;
+
+
         return 2;
-        
     }
 
     public string CardvsCard(Card card1, Card card2)
     {
-        if(card1.Damage > card2.Damage)
+        if (card1.Damage > card2.Damage)
         {
             //Add to Log
             Log.Add(Log.Count, card1.Name + " wins against " + card2.Name);
             return "Card 1 wins";
-            
         }
-        else if(card1.Damage < card2.Damage)
+
+        if (card1.Damage < card2.Damage)
         {
             //Add to Log
             Log.Add(Log.Count, card2.Name + " wins against " + card1.Name);
             return "Card 2 wins";
-            
         }
-        else
-        {
-            Log.Add(Log.Count, "Draw between " + card1.Name + " and " + card2.Name + ". Both players get a random dead card.");
-            return "Draw";
-        }
+
+        Log.Add(Log.Count,
+            "Draw between " + card1.Name + " and " + card2.Name + ". Both players get a random dead card.");
+        return "Draw";
     }
-
-
 }

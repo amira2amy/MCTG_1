@@ -2,8 +2,8 @@
 
 public class CardHandler
 {
-    public List<List<Card>> packages;
     public List<Card> baughtCards;
+    public List<List<Card>> packages;
 
     public CardHandler()
     {

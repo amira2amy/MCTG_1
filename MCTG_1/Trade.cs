@@ -7,5 +7,4 @@ public class Trade
     public string Type { get; set; }
     public double MinimumDamage { get; set; }
     public string username { get; set; }
-    
 }

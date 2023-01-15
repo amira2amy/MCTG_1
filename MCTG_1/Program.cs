@@ -1,19 +1,16 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using System;
+namespace MCTG_1;
 
-namespace MCTG_1
+internal class Program
 {
-    internal class Program
+    private static void Main(string[] args)
     {
-        private static void Main(string[] args)
-        {
-            Interaction interaction = new Interaction();
-            interaction.SetCoins();
-            Server server = new Server();
-            interaction.DeleteAllDecks();
-            interaction.DeleteAllCards();
-            server.StartServer();
-        }
+        var interaction = new Interaction();
+        interaction.SetCoins();
+        var server = new Server();
+        interaction.DeleteAllDecks();
+        interaction.DeleteAllCards();
+        server.StartServer();
     }
 }
