@@ -9,4 +9,11 @@ public class User
     public string Name { get; set; }
     public string Bio { get; set; }
     public string Image { get; set; }
+    
+    public List<Card> Deck { get; set; }
+
+    public User()
+    {
+        Deck = new List<Card>();
+    }
 }

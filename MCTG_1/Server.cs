@@ -19,15 +19,13 @@ public class Server
     private TcpListener listener;
     private Interaction interaction;
     private CardHandler cardHandler;
-    private List<Card> kienboecDeck;
-    private List<Card> altenhofDeck;
+    private Arena arena;
     public Server()
     {
         listener = new TcpListener(IPAddress.Any, 10001);
         interaction = new Interaction();
         cardHandler = new CardHandler();
-        kienboecDeck = new List<Card>();
-        altenhofDeck = new List<Card>();
+        arena = new Arena();
     }
 
     public void StartServer()
@@ -76,7 +74,7 @@ public class Server
         
         Console.WriteLine(request);
         Console.WriteLine("----------------------------");
-        string responseString = "";
+        string answerClient = "";
         string userAuthorization = "";
         string contentType = "";
 
@@ -86,11 +84,11 @@ public class Server
             User user = JsonNet.Deserialize<User>(body);
             if (interaction.RegisterUser(user))
             {
-                responseString = "User " + user.Username + " registered successfully";
+                answerClient = "User " + user.Username + " registered successfully";
             }
             else
             {
-                responseString = "User " + user.Username + " already exists";
+                answerClient = "User " + user.Username + " already exists";
             }
         }else if (method == "POST" && url == "/sessions")
         {
@@ -99,11 +97,11 @@ public class Server
             User user = JsonNet.Deserialize<User>(json);
             if (interaction.Login(user))
             {
-                responseString = "User " + user.Username + " logged in successfully";
+                answerClient = "User " + user.Username + " logged in successfully";
             }
             else
             {
-                responseString = "User " + user.Username + " login failed";
+                answerClient = "User " + user.Username + " login failed";
             }
         }else if (method == "POST" && url == "/packages")
         {
@@ -113,12 +111,12 @@ public class Server
                 // parse request body and create a new User object
                 List<Card> package = JsonNet.Deserialize<List<Card>>(json);
                 cardHandler.packages.Add(package);
-                responseString = "Package created with " + package.Count + " cards";
-                responseString = cardHandler.packages.Count + " packages created";
+                answerClient = "Package created with " + package.Count + " cards";
+                answerClient = cardHandler.packages.Count + " packages created";
             }
             else
             {
-                responseString = "Not an admin";
+                answerClient = "Not an admin";
             }
 
 
@@ -137,31 +135,31 @@ public class Server
                     interaction.SaveCards(cardHandler.baughtCards, currentUser.Username);
                     cardHandler.packages.Remove(cardHandler.packages[0]);
                     interaction.UpdateCoins(currentUser);
-                    responseString += "Package bought by " + currentUser.Username;
-                    responseString += "\nPackages left: " + cardHandler.packages.Count;
-                    responseString += "\nCoins left: " + interaction.GetUserCoins(currentUser);
+                    answerClient += "Package bought by " + currentUser.Username;
+                    answerClient += "\nPackages left: " + cardHandler.packages.Count;
+                    answerClient += "\nCoins left: " + interaction.GetUserCoins(currentUser);
                     
                 }else
                 {
-                    responseString = "No packages left";
+                    answerClient = "No packages left";
                 }
                 
             }
             else
             {
-                responseString = "Not enough coins";
+                answerClient = "Not enough coins";
             }
 
         }else if (method == "GET" && url == "/cards")
         {
             if (string.IsNullOrEmpty(token))
             {
-                responseString = "No token";
+                answerClient = "No token";
             }else
             {
                 User currentUser = new User();
                 currentUser.Username = userToken;
-                responseString = interaction.GetCardInfo(currentUser.Username);
+                answerClient = interaction.GetCardInfo(currentUser.Username);
             }
         }else if (url == "/deck")
         {
@@ -169,18 +167,18 @@ public class Server
             {
                 if (string.IsNullOrEmpty(token))
                 {
-                    responseString = "No token";
+                    answerClient = "No token";
                 }else
                 {
                     User currentUser = new User();
                     currentUser.Username = userToken;
-                    responseString = interaction.GetDeckInfo(currentUser.Username);
+                    answerClient = interaction.GetDeckInfo(currentUser.Username);
                 }
             }else if (method == "PUT")
             {
                 if (string.IsNullOrEmpty(token))
                 {
-                    responseString = "No token";
+                    answerClient = "No token";
                 }else
                 {
                     User currentUser = new User();
@@ -188,7 +186,7 @@ public class Server
                     List<string> deckString = JsonNet.Deserialize<List<string>>(body);
                     if (deckString.Count != 4)
                     {
-                        responseString = "Deck must contain 4 cards";
+                        answerClient = "Deck must contain 4 cards";
                     }
                     else
                     {
@@ -196,12 +194,12 @@ public class Server
                         List<Card> deck = interaction.GetDeckByStrings(deckString, currentUser.Username);
                         if (deck.Count < 4)
                         {
-                            responseString = "Failed: One or more cards not found in your cards";
+                            answerClient = "Failed: One or more cards not found in your cards";
                         }
                         else
                         {
                             interaction.SaveDeck(deck, currentUser.Username);
-                            responseString = "Deck saved";
+                            answerClient = "Deck saved";
                         }
                     }
                 }
@@ -212,7 +210,7 @@ public class Server
             int elo;
             currentUser.Username = userToken;
             elo = interaction.GetElo(currentUser);
-            responseString = "Elo for " + userToken + ": " + elo;
+            answerClient = "Elo for " + userToken + ": " + elo;
         }else if (method == "GET" && url == "/score")
         {
             User currentUser = new User();
@@ -226,11 +224,11 @@ public class Server
                     allElo += interaction.GetEloAndUsername(i);
                     allElo += "\n";
                 }
-                responseString = allElo;
+                answerClient = allElo;
             }
             else
             {
-                responseString = "User does not exist";
+                answerClient = "User does not exist";
             }
         }else if (url.Contains("/users/"))
         {
@@ -246,12 +244,12 @@ public class Server
                     //currentuser.Username = dataUser;
                     User user = JsonNet.Deserialize<User>(body);
                     user.Username = dataUser;
-                    responseString = "Your data is set: " + user.Name + " " + user.Bio + " " + user.Image;
+                    answerClient = "Your data is set: " + user.Name + " " + user.Bio + " " + user.Image;
                     interaction.UpdateUser(user);
                     
                 }else
                 {
-                    responseString = "User does not exist";
+                    answerClient = "User does not exist";
                 }
             }else if (method == "GET")
             {
@@ -260,22 +258,65 @@ public class Server
                     User currentuser = new User();
                     currentuser.Username = dataUser;
                     Console.WriteLine("User exists");
-                    responseString = interaction.SelectUser(currentuser);
+                    answerClient = interaction.SelectUser(currentuser);
                 }else
                 {
-                    responseString = "User does not exist";
+                    answerClient = "User does not exist";
                 }
             }
         }else if (url == "/tradings")
         {
+            if (method == "GET")
+            {
+                answerClient = interaction.GetAvailableTrades(userToken);
+            }
+            else if (method == "POST")
+            {
+                string json = body;
+                Trade trade = JsonNet.Deserialize<Trade>(json);
+                trade.username = userToken;
+
+                answerClient = interaction.UploadTrade(trade);
+            }
+            
         }
-        
+        else if (url.Contains("/tradings/"))
+        {
+            string tradeId = url.Split('/')[2];
+
+            if (method == "DELETE")
+            {
+                answerClient = interaction.DeleteTrade(tradeId, userToken);
+            }
+        }
+        else if (url == "/battles")
+        {
+            if (method == "POST")
+            {
+                User currentUser = new User();
+                currentUser.Username = userToken;
+                currentUser.Deck = interaction.GetDeckOfUser(currentUser.Username);
+                //Something wrong here!!!!!!
+                arena.AddToLobby(currentUser);
+                
+                if(arena.Lobby.Count == 2)
+                {
+                    arena.Battle();
+                    answerClient = arena.PrintLog();
+                }
+                else
+                {
+                    answerClient = "Waiting for opponent";
+                }
+            }
+        }
+
         StringBuilder response = new StringBuilder();
         StringWriter writer = new StringWriter();
         response.Append("HTTP/1.1 200 OK\r\n");
         response.Append("Content-Type: application/json\r\n");
-        response.Append("Content-Length: " + responseString.Length + "\r\n\r\n");
-        response.Append(responseString);
+        response.Append("Content-Length: " + answerClient.Length + "\r\n\r\n");
+        response.Append(answerClient);
         byte[] buffer = System.Text.Encoding.UTF8.GetBytes(response.ToString());
         stream.Write(buffer, 0, buffer.Length);
         

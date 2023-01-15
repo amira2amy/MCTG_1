@@ -570,6 +570,141 @@ public class Interaction
         }
         return deck;
     }
-    
-    
+
+    public string GetAvailableTrades(string username)
+    {
+        string trades = "Trades available (without yours): \n";
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "SELECT * from mtcg_db.public.tradings WHERE username!=@username";
+            cmd.Parameters.AddWithValue("username", username);
+            cmd.Prepare();
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    trades += "CardID: " + reader.GetString(1) + " CardType: " + reader.GetString(2) + " Minimum Damage: " + reader.GetDouble(3) + " User: " + reader.GetString(4) + "\n";
+                }
+            }
+        }
+        return trades;
+    }
+
+    public string UploadTrade(Trade trade)
+    {
+        //check if card belongs to user
+        if (!CardBelongsToUser(trade.CardToTrade, trade.username))
+        {
+            return "Card does not belong to you!";
+        }
+        
+        //upload trade
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "INSERT INTO mtcg_db.public.tradings (id, cardid, cardtype, mindamage, username) VALUES (@id, @cardid, @cardtype, @mindamage, @username)";
+            cmd.Parameters.AddWithValue("id", trade.Id);
+            cmd.Parameters.AddWithValue("cardid", trade.CardToTrade);
+            cmd.Parameters.AddWithValue("cardtype", trade.Type);
+            cmd.Parameters.AddWithValue("mindamage", trade.MinimumDamage);
+            cmd.Parameters.AddWithValue("username", trade.username);
+            cmd.Prepare();
+            cmd.ExecuteNonQuery();
+        }
+        
+        return "Trade successfully created!";
+    }
+
+    public bool CardBelongsToUser(string cardid, string username)
+    {
+        var id = GetUserID(username);
+        bool belongsToUser = false;
+        
+        //check if card belongs to user
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "SELECT * from mtcg_db.public.cards WHERE userid=@userid AND cardid=@cardid";
+            cmd.Parameters.AddWithValue("userid", id);
+            cmd.Parameters.AddWithValue("cardid", cardid);
+            cmd.Prepare();
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    belongsToUser = true;
+                }
+            }
+        }
+        return belongsToUser;
+    }
+
+    public bool TradeBelongsToUser(string tradeid, string username)
+    {
+        //check if trade belongs to user
+        bool belongsToUser = false;
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "SELECT * from mtcg_db.public.tradings WHERE username=@username AND id=@id";
+            cmd.Parameters.AddWithValue("username", username);
+            cmd.Parameters.AddWithValue("id", tradeid);
+            cmd.Prepare();
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    belongsToUser = true;
+                }
+            }
+        }
+        return belongsToUser;
+    }
+
+    public string DeleteTrade(string tradeid, string username)
+    {
+        if (!TradeBelongsToUser(tradeid, username))
+        {
+            return "This trade does not belong to you!";
+        }
+
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "DELETE FROM mtcg_db.public.tradings WHERE id=@id";
+            cmd.Parameters.AddWithValue("id", tradeid);
+            cmd.Prepare();
+            cmd.ExecuteNonQuery();
+        }
+
+        return "Trade deleted!";
+    }
+
+    public List<Card> GetDeckOfUser(string username)
+    {
+        int id = GetUserID(username);
+        
+        List<Card> deck = new List<Card>();
+        using (var cmd = new NpgsqlCommand())
+        {
+            cmd.Connection = conn;
+            cmd.CommandText = "SELECT card_id, card_name, card_damage FROM mtcg_db.public.deck WHERE user_fk = @userid";
+            cmd.Parameters.AddWithValue("userid", id);
+            cmd.Prepare();
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    Card card = new Card();
+                    card.Id = reader.GetString(0);
+                    card.Name = reader.GetString(1);
+                    card.Damage = reader.GetDouble(2);
+                    deck.Add(card);
+                }
+            }
+        }
+        return deck;
+    }
+
 }
